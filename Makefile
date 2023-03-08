@@ -3,6 +3,10 @@ GO_BUILD_COREDNS := GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=${CGO_ENABLED} go 
 COREDNS_REPO ?= https://github.com/coredns/coredns
 COREDNS_VERSION ?= $(shell go  list -m  -f '{{.Version}}' github.com/coredns/coredns)
 TOP := $(shell pwd)
+TAR := tar --strip-components 3 --mtime='1970-01-01' --sort=name --owner=root:0 --group=root:0 --numeric-owner -czvf
+ifeq ($(shell uname),Darwin)
+	TAR := tar --strip-components 3 --numeric-owner -czvf
+endif
 
 src/coredns: go.mod
 	rm -rf $@
@@ -18,19 +22,20 @@ src/coredns/core/dnsserver/zdirectives.go: src/coredns plugin.cfg
 		&& go get github.com/coredns/alternate@$(shell go list -m -f '{{.Version}}' github.com/coredns/alternate) \
 		&& go generate coredns.go
 
-build/%: src/coredns/core/dnsserver/zdirectives.go
-	cd src/coredns; $(SYSTEM) go build -v -ldflags="-s -w -X github.com/coredns/coredns/coremain.GitCommit=$$(git describe --dirty --always)" -o $(TOP)/$@/coredns
+build/out/coredns_$(COREDNS_VERSION)_%.tar.gz: build/%/coredns
+	mkdir -p build/out
+	$(TAR) $@ $<
+	shasum -a 256 $@ > $@.sha256
 
-.PHONY: build
-build:
-	$(MAKE) build/linux-arm64 SYSTEM="GOOS=linux GOARCH=arm64"
-	$(MAKE) build/linux-amd64 SYSTEM="GOOS=linux GOARCH=amd64"
-	$(MAKE) build/darwin-amd64 SYSTEM="GOOS=darwin GOARCH=amd64"
-	$(MAKE) build/darwin-arm64 SYSTEM="GOOS=darwin GOARCH=arm64"
+build/%/coredns: src/coredns/core/dnsserver/zdirectives.go
+	cd src/coredns; $(SYSTEM) go build -v -ldflags="-s -w -X github.com/coredns/coredns/coremain.GitCommit=$$(git describe --dirty --always)" -o $(TOP)/$@
 
-
-build/out/%.tar.gz: build/%
-	tar -cvf
+.PHONY: tar
+tar:
+	$(MAKE) build/out/coredns_$(COREDNS_VERSION)_linux_arm64.tar.gz SYSTEM="GOOS=linux GOARCH=arm64"
+	$(MAKE) build/out/coredns_$(COREDNS_VERSION)_linux_amd64.tar.gz SYSTEM="GOOS=linux GOARCH=amd64"
+	$(MAKE) build/out/coredns_$(COREDNS_VERSION)_darwin_arm64.tar.gz SYSTEM="GOOS=darwin GOARCH=arm64"
+	$(MAKE) build/out/coredns_$(COREDNS_VERSION)_darwin_amd64.tar.gz SYSTEM="GOOS=darwin GOARCH=amd64"
 
 .PHONY: clean/src
 clean/src:
@@ -39,6 +44,10 @@ clean/src:
 .PHONY: clean/build
 clean/build:
 	rm -rf build
+
+.PHONY: clean/build/out
+clean/build/out:
+	rm -rf build/out
 
 .PHONY: clean
 clean: clean/build clean/src
