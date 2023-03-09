@@ -27,7 +27,7 @@ jobs:
           done
       - uses: actions/upload-artifact@v3
         with:
-          name: release
+          name: coredns
           path: build/out
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
       - name: release
