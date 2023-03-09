@@ -30,3 +30,9 @@ jobs:
           name: release
           path: build/out
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            build/out/*
