@@ -1,0 +1,25 @@
+on:
+  workflow_dispatch: {}
+  pull_request: {}
+  push: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: "~1.20.1"
+      - run: |
+          make tar
+          for i in build/out/*.tar.gz; do
+            echo ${i}
+            tar -tvf ${i}
+          done
+      - name: Upload packaged chart
+        uses: actions/upload-artifact@v3
+        with:
+          name: release
+          path: build/out
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
